@@ -1,4 +1,4 @@
-# **App Name**: BoardLink Monopoly
+# **App Name**: Jen Mono Calc
 
 ## Core Features:
 
