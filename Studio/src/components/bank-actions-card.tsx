@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/utils";
 
 const paySchema = z.object({
   recipientId: z.string().min(1, { message: "You must select a recipient." }),
@@ -43,22 +44,23 @@ const paySchema = z.object({
 });
 
 const requestSchema = z.object({
-  senderId: z.string().min(1, { message: "You must select a sender." }),
+  senderId: z.string().min(1, { message: "You must select a player to request from." }),
   amount: z.coerce
     .number()
     .positive({ message: "Amount must be a positive number." }),
   remarks: z.string().optional(),
 });
 
+
 function PayForm() {
   const { transferFunds, localPlayer, players } = useGame();
-  const otherPlayers = players.filter((p) => p.id !== localPlayer?.id && !p.isBank);
+  const otherPlayers = players.filter((p) => p.id !== localPlayer?.id);
   const bank = players.find(p => p.isBank);
 
   const form = useForm<z.infer<typeof paySchema>>({
     resolver: zodResolver(paySchema),
     defaultValues: {
-      amount: 15,
+      amount: 0,
       remarks: "",
       recipientId: "",
     },
@@ -94,8 +96,8 @@ function PayForm() {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {bank && <SelectItem value={bank.id}>Bank</SelectItem>}
-                  {otherPlayers.map((player) => (
+                  {bank && <SelectItem value={bank.id}>{bank.name}</SelectItem>}
+                  {otherPlayers.filter(p => !p.isBank).map((player) => (
                     <SelectItem key={player.id} value={player.id}>
                       {player.name}
                     </SelectItem>
@@ -165,16 +167,16 @@ function PayForm() {
 
 
 function RequestForm() {
-    const { transferFunds, createRequest, localPlayer, players } = useGame();
+    const { createRequest, transferFunds, localPlayer, players } = useGame();
     const { toast } = useToast();
-    const senders = players.filter((p) => p.id !== localPlayer?.id);
+    const otherPlayersAndBank = players.filter((p) => p.id !== localPlayer?.id);
 
     const form = useForm<z.infer<typeof requestSchema>>({
         resolver: zodResolver(requestSchema),
         defaultValues: {
-            amount: 2,
-            remarks: "Passed Go",
-            senderId: "bank"
+            amount: 0,
+            remarks: "",
+            senderId: ""
         },
     });
 
@@ -183,9 +185,13 @@ function RequestForm() {
     function onSubmit(values: z.infer<typeof requestSchema>) {
         if (!localPlayer) return;
 
-        if (values.senderId === 'bank') {
-            transferFunds("bank", localPlayer.id, values.amount, values.remarks || "Received funds");
+        const recipient = players.find(p => p.id === values.senderId);
+
+        if (recipient?.isBank) {
+            // Instant transfer from bank
+            transferFunds("bank", localPlayer.id, values.amount, values.remarks || "Received from Bank");
         } else {
+            // Create a request for another player
             createRequest(localPlayer.id, values.senderId, values.amount, values.remarks || "Player Request");
             toast({ title: "Request Sent", description: `Your request for $${values.amount} has been sent.`});
         }
@@ -202,15 +208,15 @@ function RequestForm() {
               name="senderId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>From</FormLabel>
+                  <FormLabel>Request from</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a sender..." />
+                        <SelectValue placeholder="Select a player or the bank..." />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {senders.map((player) => (
+                      {otherPlayersAndBank.map((player) => (
                         <SelectItem key={player.id} value={player.id}>
                           {player.name}
                         </SelectItem>
@@ -264,7 +270,7 @@ function RequestForm() {
                 <FormItem>
                   <FormLabel>Remarks (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. Bank Error in Your Favor" {...field} />
+                    <Input placeholder="e.g. Rent for Boardwalk" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -283,7 +289,7 @@ export function BankActionsCard() {
 
   const handlePassGo = () => {
     if (!localPlayer) return;
-    bankTransaction(localPlayer.id, 'receive', 2_000_000, "Passed GO");
+    bankTransaction(localPlayer.id, 'receive', 2000000, "Passed GO");
   }
 
   return (
@@ -293,10 +299,10 @@ export function BankActionsCard() {
             <div>
                 <CardTitle className="flex items-center gap-2">
                     <Landmark className="text-primary" />
-                    Transactions
+                    {localPlayer?.name}'s Actions
                 </CardTitle>
                 <CardDescription>
-                  Pay or request funds from others.
+                  Balance: <span className="font-bold text-primary">${localPlayer ? formatCurrency(localPlayer.balance) : '0'}</span>
                 </CardDescription>
             </div>
             <Button onClick={handlePassGo} variant="outline">
