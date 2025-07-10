@@ -299,9 +299,9 @@ export function BankActionsCard() {
             <div>
                 <CardTitle className="flex items-center gap-2">
                     <Landmark className="text-primary" />
-                    {localPlayer?.name}'s Actions
+                    {localPlayer?.name}
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="!mt-1">
                   Balance: <span className="font-bold text-primary">${localPlayer ? formatCurrency(localPlayer.balance) : '0'}</span>
                 </CardDescription>
             </div>
