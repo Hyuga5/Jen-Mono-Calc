@@ -19,35 +19,37 @@ import type { FundRequest } from "@/lib/types";
 export function FundRequestDialog() {
   const { requests, acceptRequest, declineRequest } = useGame();
   const [currentRequest, setCurrentRequest] = useState<FundRequest | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    if (requests.length > 0 && !isOpen) {
-      // Show the oldest request first
-      const sortedRequests = [...requests].sort((a, b) => (a.timestamp as number) - (b.timestamp as number));
-      setCurrentRequest(sortedRequests[0]);
-      setIsOpen(true);
+    if (requests.length > 0) {
+      // Find a request that hasn't been shown yet
+      const newRequest = requests.find(r => r.id !== currentRequest?.id);
+      if (newRequest) {
+          const sortedRequests = [...requests].sort((a, b) => (a.timestamp as number) - (b.timestamp as number));
+          setCurrentRequest(sortedRequests[0]);
+      }
+    } else {
+        // Clear if there are no more requests
+        setCurrentRequest(null);
     }
-  }, [requests, isOpen]);
+  }, [requests, currentRequest]);
 
   if (!currentRequest) {
     return null;
   }
-
+  
   const handleAccept = () => {
     acceptRequest(currentRequest);
-    setIsOpen(false);
     setCurrentRequest(null);
   };
 
   const handleDecline = () => {
     declineRequest(currentRequest.id);
-    setIsOpen(false);
     setCurrentRequest(null);
   };
   
   return (
-    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+    <AlertDialog open={!!currentRequest}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Incoming Fund Request</AlertDialogTitle>
