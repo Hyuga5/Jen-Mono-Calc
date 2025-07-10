@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -306,7 +305,7 @@ export function BankActionsCard() {
                 </CardDescription>
             </div>
             <Button onClick={handlePassGo} variant="outline">
-                <Forward className="mr-2"/> Pass Go (+$2M)
+                <Forward className="mr-2"/> Pass Go
             </Button>
         </div>
       </CardHeader>
