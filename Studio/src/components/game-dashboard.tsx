@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useGame } from "@/contexts/game-context";
@@ -28,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { InvitePlayersCard } from "./invite-players-card";
+import { FundRequestDialog } from "./fund-request-dialog";
 
 function CreatorActions() {
     const { endGame } = useGame();
@@ -92,6 +94,7 @@ export function GameDashboard() {
 
   return (
     <div className="min-h-screen bg-secondary/50 dark:bg-background">
+      <FundRequestDialog />
       <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-sm border-b">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-4">
