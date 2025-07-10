@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -24,6 +24,7 @@ import {
 import { Landmark, PlusCircle, LogIn, Loader2 } from "lucide-react";
 import { useGame } from "@/contexts/game-context";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSearchParams } from "next/navigation";
 
 const createGameSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -39,6 +40,8 @@ export function Lobby() {
     const { createGame, joinGame } = useGame();
     const [isCreating, setIsCreating] = useState(false);
     const [isJoining, setIsJoining] = useState(false);
+    const [activeTab, setActiveTab] = useState("create");
+    const searchParams = useSearchParams();
 
     const createForm = useForm<z.infer<typeof createGameSchema>>({
         resolver: zodResolver(createGameSchema),
@@ -49,6 +52,15 @@ export function Lobby() {
         resolver: zodResolver(joinGameSchema),
         defaultValues: { name: "", gameId: "" },
     });
+
+    useEffect(() => {
+        const gameIdFromUrl = searchParams.get('gameId');
+        if (gameIdFromUrl) {
+            joinForm.setValue('gameId', gameIdFromUrl.toUpperCase());
+            setActiveTab('join');
+        }
+    }, [searchParams, joinForm]);
+
 
     const handleCreateGame = async (values: z.infer<typeof createGameSchema>) => {
         setIsCreating(true);
@@ -75,11 +87,11 @@ export function Lobby() {
                     <div className="mx-auto bg-primary text-primary-foreground rounded-full p-3 w-fit mb-4">
                         <Landmark className="h-8 w-8" />
                     </div>
-                    <CardTitle className="font-headline text-3xl">Jenish MonoCalc</CardTitle>
+                    <CardTitle className="font-headline text-3xl">Jen MonoCalc</CardTitle>
                     <CardDescription>The digital banking companion</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Tabs defaultValue="create" className="w-full">
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="create">Create Game</TabsTrigger>
                             <TabsTrigger value="join">Join Game</TabsTrigger>
