@@ -27,6 +27,7 @@ import { useOnlineStatus } from "@/hooks/use-online-status";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
+import { InvitePlayersCard } from "./invite-players-card";
 
 function CreatorActions() {
     const { endGame } = useGame();
@@ -97,7 +98,7 @@ export function GameDashboard() {
             <Landmark className="h-7 w-7 text-primary" />
             <div>
               <h1 className="text-xl font-bold font-headline">
-                Jenish MonoCalc
+                Jen MonoCalc
               </h1>
               {gameId && (
                 <div className="flex items-center gap-1.5">
@@ -133,6 +134,7 @@ export function GameDashboard() {
             <TransactionLog />
           </div>
           <div className="lg:col-span-1 space-y-6">
+            <InvitePlayersCard gameId={gameId} />
             <PlayerList />
           </div>
         </div>
