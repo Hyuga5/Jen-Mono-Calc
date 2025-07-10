@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -9,7 +10,7 @@ import {
   useCallback,
 } from "react";
 import { ref, set, onValue, get, child, serverTimestamp, remove, update } from "firebase/database";
-import type { Player, Transaction, GameSession } from "@/lib/types";
+import type { Player, Transaction, GameSession, FundRequest } from "@/lib/types";
 import { db } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { useOnlineStatus } from "@/hooks/use-online-status";
@@ -20,6 +21,7 @@ interface GameContextType {
   localPlayer: Player | null;
   players: Player[];
   transactions: Transaction[];
+  requests: FundRequest[];
   isLoading: boolean;
   isCreator: boolean;
   createGame: (playerName: string, startingBudget: number) => Promise<string | undefined>;
@@ -36,6 +38,14 @@ interface GameContextType {
     amount: number,
     remarks: string
   ) => void;
+  createRequest: (
+    fromId: string,
+    toId: string,
+    amount: number,
+    remarks: string
+  ) => void;
+  acceptRequest: (request: FundRequest) => void;
+  declineRequest: (requestId: string) => void;
   endGame: () => void;
   leaveGame: () => void;
 }
@@ -114,6 +124,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
           creatorId: newPlayerId,
           players: { [bank.id]: bank, [newPlayer.id]: newPlayer },
           transactions: {},
+          requests: {},
           createdAt: serverTimestamp(),
         };
 
@@ -181,7 +192,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const fromPlayer = gameSession.players[fromId];
       const toPlayer = gameSession.players[toId];
 
-      if (!fromPlayer || !toPlayer || amount <= 0) {
+      if (!fromPlayer || !toPlayer || amount < 0) { // allow 0 amount for simplicity
         toast({ variant: 'destructive', title: 'Invalid Transaction' });
         return;
       }
@@ -222,6 +233,47 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [transferFunds]);
 
+  const createRequest = useCallback((fromId: string, toId: string, amount: number, remarks: string) => {
+    if (!gameId || !db || !gameSession) return;
+    
+    const fromPlayer = gameSession.players[fromId];
+    const toPlayer = gameSession.players[toId];
+
+    if (!fromPlayer || !toPlayer) return;
+
+    const reqId = `req_${Date.now()}`;
+    const newRequest: FundRequest = {
+      id: reqId,
+      fromId,
+      fromName: fromPlayer.name,
+      toId,
+      toName: toPlayer.name,
+      amount,
+      remarks,
+      timestamp: serverTimestamp(),
+    };
+
+    const requestRef = ref(db, `games/${gameId}/requests/${reqId}`);
+    set(requestRef, newRequest).catch(error => {
+      console.error("Request creation failed:", error);
+      toast({variant: "destructive", title: "Request Failed", description: "Could not create the fund request."});
+    });
+  }, [gameId, gameSession, toast, db]);
+
+  const acceptRequest = useCallback((request: FundRequest) => {
+    if (!gameId || !db) return;
+    transferFunds(request.toId, request.fromId, request.amount, request.remarks);
+    const requestRef = ref(db, `games/${gameId}/requests/${request.id}`);
+    remove(requestRef);
+  }, [gameId, db, transferFunds]);
+
+  const declineRequest = useCallback((requestId: string) => {
+    if (!gameId || !db) return;
+    const requestRef = ref(db, `games/${gameId}/requests/${requestId}`);
+    remove(requestRef);
+  }, [gameId, db]);
+
+
   const endGame = useCallback((showToast = true) => {
     if (gameId && db) {
         const gameRef = ref(db, `games/${gameId}`);
@@ -253,6 +305,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const players = gameSession?.players ? Object.values(gameSession.players) : [];
   const transactions = gameSession?.transactions ? Object.values(gameSession.transactions).sort((a,b) => (b.timestamp as number) - (a.timestamp as number)) : [];
   const localPlayer = gameSession && localPlayerId ? gameSession.players[localPlayerId] : null;
+  const requests = gameSession?.requests ? Object.values(gameSession.requests).filter(r => r.toId === localPlayerId) : [];
   const isCreator = !!(gameSession?.creatorId && localPlayerId && gameSession.creatorId === localPlayerId);
 
   return (
@@ -263,12 +316,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
         localPlayer,
         players,
         transactions,
+        requests,
         isLoading,
         isCreator,
         createGame,
         joinGame,
         transferFunds,
         bankTransaction,
+        createRequest,
+        acceptRequest,
+        declineRequest,
         endGame,
         leaveGame,
       }}
