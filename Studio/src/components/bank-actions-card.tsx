@@ -22,7 +22,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Landmark, ArrowRightLeft } from "lucide-react";
+import { Landmark, ArrowRightLeft, Forward } from "lucide-react";
 import { useGame } from "@/contexts/game-context";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 
 const paySchema = z.object({
   recipientId: z.string().min(1, { message: "You must select a recipient." }),
@@ -41,7 +42,7 @@ const paySchema = z.object({
   remarks: z.string().optional(),
 });
 
-const receiveSchema = z.object({
+const requestSchema = z.object({
   senderId: z.string().min(1, { message: "You must select a sender." }),
   amount: z.coerce
     .number()
@@ -52,6 +53,7 @@ const receiveSchema = z.object({
 function PayForm() {
   const { transferFunds, localPlayer, players } = useGame();
   const otherPlayers = players.filter((p) => p.id !== localPlayer?.id && !p.isBank);
+  const bank = players.find(p => p.isBank);
 
   const form = useForm<z.infer<typeof paySchema>>({
     resolver: zodResolver(paySchema),
@@ -92,7 +94,7 @@ function PayForm() {
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="bank">Bank</SelectItem>
+                  {bank && <SelectItem value={bank.id}>Bank</SelectItem>}
                   {otherPlayers.map((player) => (
                     <SelectItem key={player.id} value={player.id}>
                       {player.name}
@@ -117,8 +119,9 @@ function PayForm() {
                     step="any" 
                     {...field}
                     onChange={(e) => {
-                      field.onChange(e);
-                      setBaseAmount(e.target.value);
+                      const val = e.target.value;
+                      field.onChange(val === '' ? '' : Number(val));
+                      setBaseAmount(val);
                     }}
                   />
                 </FormControl>
@@ -161,12 +164,13 @@ function PayForm() {
 }
 
 
-function ReceiveForm() {
-    const { transferFunds, localPlayer, players } = useGame();
+function RequestForm() {
+    const { transferFunds, createRequest, localPlayer, players } = useGame();
+    const { toast } = useToast();
     const senders = players.filter((p) => p.id !== localPlayer?.id);
 
-    const form = useForm<z.infer<typeof receiveSchema>>({
-        resolver: zodResolver(receiveSchema),
+    const form = useForm<z.infer<typeof requestSchema>>({
+        resolver: zodResolver(requestSchema),
         defaultValues: {
             amount: 2,
             remarks: "Passed Go",
@@ -176,9 +180,16 @@ function ReceiveForm() {
 
     const [baseAmount, setBaseAmount] = useState<string | number>(form.getValues("amount"));
     
-    function onSubmit(values: z.infer<typeof receiveSchema>) {
+    function onSubmit(values: z.infer<typeof requestSchema>) {
         if (!localPlayer) return;
-        transferFunds(values.senderId, localPlayer.id, values.amount, values.remarks || "Received funds");
+
+        if (values.senderId === 'bank') {
+            transferFunds("bank", localPlayer.id, values.amount, values.remarks || "Received funds");
+        } else {
+            createRequest(localPlayer.id, values.senderId, values.amount, values.remarks || "Player Request");
+            toast({ title: "Request Sent", description: `Your request for $${values.amount} has been sent.`});
+        }
+        
         form.reset({ amount: 0, remarks: "", senderId: "" });
         setBaseAmount(0);
     }
@@ -223,8 +234,9 @@ function ReceiveForm() {
                         step="any"
                         {...field}
                         onChange={(e) => {
-                          field.onChange(e);
-                          setBaseAmount(e.target.value);
+                          const val = e.target.value;
+                          field.onChange(val === '' ? '' : Number(val));
+                          setBaseAmount(val);
                         }}
                       />
                     </FormControl>
@@ -259,7 +271,7 @@ function ReceiveForm() {
               )}
             />
             <Button type="submit" variant="secondary" className="w-full !mt-6">
-                Receive Funds
+                Request Funds
             </Button>
           </form>
         </Form>
@@ -267,28 +279,42 @@ function ReceiveForm() {
 }
 
 export function BankActionsCard() {
+  const { bankTransaction, localPlayer } = useGame();
+
+  const handlePassGo = () => {
+    if (!localPlayer) return;
+    bankTransaction(localPlayer.id, 'receive', 2_000_000, "Passed GO");
+  }
+
   return (
     <Card className="shadow-lg">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-            <Landmark className="text-primary" />
-            Transactions
-        </CardTitle>
-        <CardDescription>
-          Pay players or the bank, and receive money from players or the bank.
-        </CardDescription>
+        <div className="flex justify-between items-start">
+            <div>
+                <CardTitle className="flex items-center gap-2">
+                    <Landmark className="text-primary" />
+                    Transactions
+                </CardTitle>
+                <CardDescription>
+                  Pay or request funds from others.
+                </CardDescription>
+            </div>
+            <Button onClick={handlePassGo} variant="outline">
+                <Forward className="mr-2"/> Pass Go (+$2M)
+            </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="pay" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="pay">Pay</TabsTrigger>
-                <TabsTrigger value="receive">Receive</TabsTrigger>
+                <TabsTrigger value="request">Request</TabsTrigger>
             </TabsList>
             <TabsContent value="pay" className="pt-4">
                 <PayForm />
             </TabsContent>
-            <TabsContent value="receive" className="pt-4">
-                <ReceiveForm />
+            <TabsContent value="request" className="pt-4">
+                <RequestForm />
             </TabsContent>
         </Tabs>
       </CardContent>
